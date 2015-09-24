@@ -12,6 +12,9 @@
 #define TURN_LEFT 5
 #define TURN_RIGHT 6
 
+//PWM
+#define PWM_DEF 120
+
 //センサの最大値
 #define SENSOR_MAX 450
 
@@ -27,6 +30,7 @@ void setup(){
   Serial.begin(9600);
 
   ble_begin();
+  //何故か起動直後に10番ピンに5Vが出力されるので強制停止
   _stop();
 }
 
@@ -34,14 +38,14 @@ void loop(){
   int sensorL = analogRead(0);
   int sensorR = analogRead(1);
 
-  //もしセンサＬ，Ｒ両方に反応があれば後退
+  //もしセンサL,R両方に反応があれば後退
   if(sensorR > SENSOR_MAX && sensorL > SENSOR_MAX){
     back();
     delay(600);
     doCommand();
   }
   else if(sensorL > SENSOR_MAX){
-    //もしセンサＬにだけ反応があれば右旋回
+    //もしセンサLにだけ反応があれば右旋回
     //右旋回
     turnRight();
     delay(400);
@@ -50,7 +54,7 @@ void loop(){
     doCommand();
   }
   else if(sensorR > SENSOR_MAX){
-    //もしセンサＲにのみ反応があれば左旋回
+    //もしセンサRにのみ反応があれば左旋回
     //左旋回
     turnLeft();
     delay(400);
@@ -106,7 +110,7 @@ void _stop(){
 //前進
 void forward(){
   Serial.println("FORWARD");
-  analogWrite(leftP, 80);
+  analogWrite(leftP, PWM_DEF);
   analogWrite(leftN, 0);
   analogWrite(rightP, 80);
   analogWrite(rightN, 0);
@@ -116,9 +120,9 @@ void forward(){
 void back(){
   Serial.println("BACK");
   analogWrite(leftP, 0);
-  analogWrite(leftN, 80);
+  analogWrite(leftN, PWM_DEF);
   analogWrite(rightP, 0);
-  analogWrite(rightN, 80);
+  analogWrite(rightN, PWM_DEF);
 }
 
 //左折
@@ -126,14 +130,14 @@ void left(){
   Serial.println("LEFT");
   analogWrite(leftP, 0);
   analogWrite(leftN, 0);
-  analogWrite(rightP, 80);
+  analogWrite(rightP, PWM_DEF);
   analogWrite(rightN, 0);
 }
 
 //右折
 void right(){
   Serial.println("RIGHT");
-  analogWrite(leftP, 80);
+  analogWrite(leftP, PWM_DEF);
   analogWrite(leftN, 0);
   analogWrite(rightP, 0);
   analogWrite(rightN, 0);
@@ -143,22 +147,16 @@ void right(){
 void turnLeft(){
   Serial.println("TURN LEFT");
   analogWrite(leftP, 0);
-  analogWrite(leftN, 80);
-  analogWrite(rightP, 80);
+  analogWrite(leftN, PWM_DEF);
+  analogWrite(rightP, PWM_DEF);
   analogWrite(rightN, 0);
 }
 
 //右回転
 void turnRight(){
   Serial.println("TURN RIGHT");
-  analogWrite(leftP, 80);
+  analogWrite(leftP, PWM_DEF);
   analogWrite(leftN, 0);
   analogWrite(rightP, 0);
-  analogWrite(rightN, 80);
+  analogWrite(rightN, PWM_DEF);
 }
-
-
-
-
-
-
