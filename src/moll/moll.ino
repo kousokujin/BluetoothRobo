@@ -4,6 +4,11 @@
 #include <services.h>
 #include <Servo.h> 
 
+//Type
+#define SET_UP 0
+#define COMMAND 1
+
+//Commands
 #define STOP 0
 #define FORWARD 1
 #define BACK 2
@@ -12,68 +17,126 @@
 #define TURN_LEFT 5
 #define TURN_RIGHT 6
 
+//Connection status
+#define DISCONNECTED 0
+#define CONNECTED 1
+
 //PWM
 #define PWM_DEF 120
 
-//センサの最大値
-#define SENSOR_MAX 450
+//デフォルトのセンサの閾値
+#define SENSOR_THRESHOLD_DEF 500
 
+//回避の転回時間
+#define TURN_DELAY 700
+
+//ピン番号
 int leftP = 5;
 int leftN = 6;
 int rightP = 3;
 int rightN = 10;
 
+int ledRed = 0;
+int ledGreen = 1;
+int ledBlue = 2;
+
+//センサの閾値
+int sensorThreshold = SENSOR_THRESHOLD_DEF;
+
 byte command = STOP;
 
 void setup(){
+  //ピンの初期化
+  pinMode(ledRed, OUTPUT);
+  pinMode(ledGreen, OUTPUT);
+  pinMode(ledBlue, OUTPUT);
+
   //9600bpsらしいで
   Serial.begin(9600);
 
-  ble_begin();
   //何故か起動直後に10番ピンに5Vが出力されるので強制停止
   _stop();
+
+  ble_begin();
 }
 
 void loop(){
   int sensorL = analogRead(0);
   int sensorR = analogRead(1);
 
-  //もしセンサL,R両方に反応があれば後退
-  if(sensorR > SENSOR_MAX && sensorL > SENSOR_MAX){
+  if(ble_connected() == CONNECTED){
+    //LED緑でいいかなめんどくさい
+    setLed(LOW, HIGH, LOW);
+  }
+  else{
+    //LEDを赤く
+    setLed(HIGH, LOW, LOW);
+    //切断した場合強制停止
+    command = STOP;
+    doCommand(command);
+  }
+
+  //センサL,R両方に反応があれば後退
+  if(sensorR > sensorThreshold && sensorL > sensorThreshold){
     back();
     delay(600);
-    doCommand();
+    doCommand(command);
   }
-  else if(sensorL > SENSOR_MAX){
-    //もしセンサLにだけ反応があれば右旋回
+  else if(sensorL > sensorThreshold){
+    //センサLにだけ反応があれば右旋回
+    //若干下がる
+    back();
+    delay(200);
     //右旋回
     turnRight();
-    delay(400);
+    delay(TURN_DELAY);
+    doCommand(command);
+  }
+  else if(sensorR > sensorThreshold){
+    //センサRにのみ反応があれば左旋回
+    //若干下がる
     back();
     delay(200);
-    doCommand();
-  }
-  else if(sensorR > SENSOR_MAX){
-    //もしセンサRにのみ反応があれば左旋回
     //左旋回
     turnLeft();
-    delay(400);
-    back();
-    delay(200);
-    doCommand();
+    delay(TURN_DELAY);
+    doCommand(command);
   }
   else{
     while(ble_available()){
-      command = ble_read();
-      doCommand();
+      byte value1 = ble_read();
+      byte *value = new byte[4];
+      int data = 0;
+
+      //value1で信号の種類を識別
+      switch(value1){
+        //センサの閾値を変更
+      case SET_UP:
+        //byte配列の取得
+        for(int i = 0; i < 4 ; i++){
+          value[i] = ble_read();
+        }
+        //int型に変換
+        for(int i = 0 ; i < 4 ; i++){
+          data = (data << 8) + value[i]; 
+        }
+        sensorThreshold = data;
+        Serial.println(sensorThreshold);
+        break;
+        //コマンドを実行
+      case COMMAND:
+        command = ble_read();
+        doCommand(command);
+        break;
+      }
     }
   }
-  
+
   ble_do_events();
 }
 
-void doCommand(){
-  switch(command){
+void doCommand(byte _command){
+  switch(_command){
   case STOP:
     _stop();
     break;
@@ -112,7 +175,7 @@ void forward(){
   Serial.println("FORWARD");
   analogWrite(leftP, PWM_DEF);
   analogWrite(leftN, 0);
-  analogWrite(rightP, 80);
+  analogWrite(rightP, PWM_DEF);
   analogWrite(rightN, 0);
 }
 
@@ -160,3 +223,13 @@ void turnRight(){
   analogWrite(rightP, 0);
   analogWrite(rightN, PWM_DEF);
 }
+
+//LEDの設定
+void setLed(int red,int green, int blue){
+  digitalWrite(ledRed, red);
+  digitalWrite(ledGreen, green);
+  digitalWrite(ledBlue, blue);
+
+}
+
+
