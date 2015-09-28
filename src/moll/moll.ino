@@ -135,6 +135,14 @@ void loop(){
   ble_do_events();
 }
 
+//LEDの設定
+void setLed(int red,int green, int blue){
+  digitalWrite(ledRed, red);
+  digitalWrite(ledGreen, green);
+  digitalWrite(ledBlue, blue);
+}
+
+//コマンドの実行
 void doCommand(byte _command){
   switch(_command){
   case STOP:
@@ -222,14 +230,6 @@ void turnRight(){
   analogWrite(leftN, 0);
   analogWrite(rightP, 0);
   analogWrite(rightN, PWM_DEF);
-}
-
-//LEDの設定
-void setLed(int red,int green, int blue){
-  digitalWrite(ledRed, red);
-  digitalWrite(ledGreen, green);
-  digitalWrite(ledBlue, blue);
-
 }
 
 
