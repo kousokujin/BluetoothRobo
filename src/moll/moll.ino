@@ -39,12 +39,14 @@ int leftN = 6;
 int rightP = 3;
 int rightN = 10;
 
-int ledRed = 0;
-int ledGreen = 1;
-int ledBlue = 2;
+int ledRed = 19;
+int ledGreen = 18;
+int ledBlue = 17;
 
 //速度
-int velocity = DEFAULT_VELOCITY;
+int velocityL = DEFAULT_VELOCITY;
+int velocityR = DEFAULT_VELOCITY;
+
 //センサの閾値
 int sensorThreshold = DEFAULT_SENSOR_THRESHOLD;
 //回避の後退時間
@@ -53,6 +55,8 @@ int backPeriod = DEFAULT_BACK_PERIOD;
 int turnPeriod = DEFAULT_TURN_PERIOD;
 
 byte command = STOP;
+
+int connectionStatus = DISCONNECTED;
 
 void setup(){
   //ピンの初期化
@@ -65,6 +69,8 @@ void setup(){
 
   //何故か起動直後に10番ピンに5Vが出力されるので強制停止
   _stop();
+  //LEDの初期化
+  setLed(HIGH, LOW, LOW);
 
   ble_begin();
 }
@@ -73,17 +79,22 @@ void loop(){
   int sensorL = analogRead(0);
   int sensorR = analogRead(1);
 
-  if(ble_connected() == CONNECTED){
-    //LED緑でいいかなめんどくさい
-    setLed(LOW, HIGH, LOW);
+  if(ble_connected() != connectionStatus){
+    connectionStatus = ble_connected();
+    if(connectionStatus == CONNECTED){
+      //LED緑でいいかなめんどくさい
+      setLed(LOW, HIGH, LOW);
+    }
+    else{
+      //LEDを赤く
+      setLed(HIGH, LOW, LOW);
+      //切断した場合強制停止
+      command = STOP;
+      doCommand(command); 
+    }  
   }
-  else{
-    //LEDを赤く
-    setLed(HIGH, LOW, LOW);
-    //切断した場合強制停止
-    command = STOP;
-    doCommand(command);
-  }
+
+
 
   //センサL,R両方に反応があれば後退
   if(sensorR > sensorThreshold && sensorL > sensorThreshold){
@@ -92,16 +103,16 @@ void loop(){
     doCommand(command);
   }
   else if(sensorL > sensorThreshold){
-    //センサLにだけ反応があれば右旋回
+    //センサLにだけ反応があれば左旋回
     //右折後退
-    rightBack();
+    leftBack();
     delay(turnPeriod);
     doCommand(command);
   }
   else if(sensorR > sensorThreshold){
-    //センサRにのみ反応があれば左旋回
+    //センサRにのみ反応があれば右旋回
     //左折後退
-    leftBack();
+    rightBack();
     delay(turnPeriod);
     doCommand(command);
   }
@@ -115,7 +126,8 @@ void loop(){
       switch(value1){
       case SET_UP:
         //速度(最高でも255だから特に変換は必要ない)
-        velocity = ble_read();
+        velocityL = ble_read();
+        velocityR = ble_read();
         for(int i = 0 ; i < 3 ;i++){
           //センサの閾値を変更
           //byte配列の取得
@@ -205,9 +217,9 @@ void _stop(){
 //前進
 void forward(){
   //Serial.println("FORWARD");
-  analogWrite(leftP, velocity);
+  analogWrite(leftP, velocityL);
   analogWrite(leftN, 0);
-  analogWrite(rightP, velocity);
+  analogWrite(rightP, velocityR);
   analogWrite(rightN, 0);
 }
 
@@ -215,27 +227,27 @@ void forward(){
 void back(){
   //Serial.println("BACK");
   analogWrite(leftP, 0);
-  analogWrite(leftN, velocity);
+  analogWrite(leftN, velocityL);
   analogWrite(rightP, 0);
-  analogWrite(rightN, velocity);
+  analogWrite(rightN, velocityR);
 }
 
 //左回転
 void turnLeft(){
   //Serial.println("TURN LEFT");
   analogWrite(leftP, 0);
-  analogWrite(leftN, velocity);
-  analogWrite(rightP, velocity);
+  analogWrite(leftN, velocityL);
+  analogWrite(rightP, velocityR);
   analogWrite(rightN, 0);
 }
 
 //右回転
 void turnRight(){
   //Serial.println("TURN RIGHT");
-  analogWrite(leftP, velocity);
+  analogWrite(leftP, velocityL);
   analogWrite(leftN, 0);
   analogWrite(rightP, 0);
-  analogWrite(rightN, velocity);
+  analogWrite(rightN, velocityR);
 }
 
 //左折前進
@@ -243,14 +255,14 @@ void leftForward(){
   //Serial.println("LEFT_FORWARD");
   analogWrite(leftP, 0);
   analogWrite(leftN, 0);
-  analogWrite(rightP, velocity);
+  analogWrite(rightP, velocityR);
   analogWrite(rightN, 0);
 }
 
 //右折前進
 void rightForward(){
   //Serial.println("RIGHT_FORWARD");
-  analogWrite(leftP, velocity);
+  analogWrite(leftP, velocityL);
   analogWrite(leftN, 0);
   analogWrite(rightP, 0);
   analogWrite(rightN, 0);
@@ -262,14 +274,14 @@ void leftBack(){
   analogWrite(leftP, 0);
   analogWrite(leftN, 0);
   analogWrite(rightP, 0);
-  analogWrite(rightN, velocity);
+  analogWrite(rightN, velocityR);
 }
 
 //右折前進
 void rightBack(){
   //Serial.println("RIGHT_BACK");
   analogWrite(leftP, 0);
-  analogWrite(leftN, velocity);
+  analogWrite(leftN, velocityL);
   analogWrite(rightP, 0);
   analogWrite(rightN, 0);
 }
@@ -282,4 +294,7 @@ int bytesToInt(byte bytes[]){
   }
   return value;
 }
+
+
+
 
