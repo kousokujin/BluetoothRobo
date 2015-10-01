@@ -1,3 +1,4 @@
+
 #include <SPI.h>
 #include <boards.h>
 #include <RBL_nRF8001.h>
@@ -94,8 +95,6 @@ void loop(){
     }  
   }
 
-
-
   //センサL,R両方に反応があれば後退
   if(sensorR > sensorThreshold && sensorL > sensorThreshold){
     back();
@@ -103,27 +102,25 @@ void loop(){
     doCommand(command);
   }
   else if(sensorL > sensorThreshold){
-    //センサLにだけ反応があれば左旋回
-    //右折後退
+    //sensorLにだけ反応があれば右折後退
     leftBack();
     delay(turnPeriod);
     doCommand(command);
   }
   else if(sensorR > sensorThreshold){
-    //センサRにのみ反応があれば右旋回
-    //左折後退
+    //sensorRにのみ反応があれば左折後退
     rightBack();
     delay(turnPeriod);
     doCommand(command);
   }
   else{
     while(ble_available()){
-      byte value1 = ble_read();
+      byte value = ble_read();
       byte bytes[4];
       int red,green,blue;
 
-      //value1で信号の種類を識別
-      switch(value1){
+      //valueで信号の種類を識別
+      switch(value){
       case SET_UP:
         //速度(最高でも255だから特に変換は必要ない)
         velocityL = ble_read();
@@ -152,6 +149,7 @@ void loop(){
         command = ble_read();
         doCommand(command);
         break;
+        //LEDの色を変更
       case SET_LED:
         red = ble_read();
         green  = ble_read();
@@ -161,7 +159,6 @@ void loop(){
       }
     }
   }
-
   ble_do_events();
 }
 
@@ -294,7 +291,3 @@ int bytesToInt(byte bytes[]){
   }
   return value;
 }
-
-
-
-
