@@ -7,23 +7,27 @@
 
 //Type
 #define SET_UP 0
-#define COMMAND 1
+#define MOVE 1
 #define SET_LED 2
 
 //Commands
-#define STOP 0
-#define FORWARD 1
-#define BACK 2
-#define TURN_LEFT 3
-#define TURN_RIGHT 4
-#define LEFT_FORWARD 5
-#define RIGHT_FORWARD 6
-#define LEFT_BACK 7
-#define RIGHT_BACK 8
+#define STOP 0,0,0,0
+#define FORWARD defVelocityL,0,defVelocityR,0
+#define BACK 0,defVelocityL,0,defVelocityR
+#define TURN_LEFT 0,defVelovityL,defVelocityR,0
+#define TURN_RIGHT defVelocityL,0,0,defVelocityR
+#define LEFT_FORWARD 0,0,defVelocityR,0
+#define RIGHT_FORWARD defVelocityL,0,0,0
+#define LEFT_BACK 0,0,0,defVelocityR
+#define RIGHT_BACK 0,defVelocityL,0,0
 
 //Connection status
 #define DISCONNECTED 0
 #define CONNECTED 1
+
+//LED
+#define RED HIGH,LOW,LOW
+#define GREEN LOW,HIGH,LOW
 
 //デフォルトの速度(PWM)
 #define DEFAULT_VELOCITY 120
@@ -45,8 +49,10 @@ int ledGreen = 18;
 int ledBlue = 17;
 
 //速度
-int velocityL = DEFAULT_VELOCITY;
-int velocityR = DEFAULT_VELOCITY;
+int defVelocityL = DEFAULT_VELOCITY;
+int defVelocityR = DEFAULT_VELOCITY;
+
+int velocityLP,velocityLN,velocityRP,velocityRN;
 
 //センサの閾値
 int sensorThreshold = DEFAULT_SENSOR_THRESHOLD;
@@ -54,8 +60,6 @@ int sensorThreshold = DEFAULT_SENSOR_THRESHOLD;
 int backPeriod = DEFAULT_BACK_PERIOD;
 //回避の転回時間
 int turnPeriod = DEFAULT_TURN_PERIOD;
-
-byte command = STOP;
 
 int connectionStatus = DISCONNECTED;
 
@@ -69,9 +73,9 @@ void setup(){
   Serial.begin(9600);
 
   //何故か起動直後に10番ピンに5Vが出力されるので強制停止
-  _stop();
+  _move(STOP);
   //LEDの初期化
-  setLed(HIGH, LOW, LOW);
+  setLed(RED);
 
   ble_begin();
 }
@@ -84,77 +88,61 @@ void loop(){
     connectionStatus = ble_connected();
     if(connectionStatus == CONNECTED){
       //LED緑でいいかなめんどくさい
-      setLed(LOW, HIGH, LOW);
+      setLed(GREEN);
     }
     else{
       //LEDを赤く
-      setLed(HIGH, LOW, LOW);
+      setLed(RED);
       //切断した場合強制停止
-      command = STOP;
-      doCommand(command); 
+      _move(velocityLP = 0, velocityLN = 0, velocityRP = 0, velocityRN = 0); 
     }  
   }
 
   //センサL,R両方に反応があれば後退
   if(sensorR > sensorThreshold && sensorL > sensorThreshold){
-    back();
+    _move(BACK);
     delay(backPeriod);
-    doCommand(command);
+    _move(velocityLP, velocityLN, velocityRP, velocityRN);
   }
   else if(sensorL > sensorThreshold){
     //sensorLにだけ反応があれば右折後退
-    leftBack();
+    _move(LEFT_BACK);
     delay(turnPeriod);
-    doCommand(command);
+    _move(velocityLP, velocityLN, velocityRP, velocityRN);
   }
   else if(sensorR > sensorThreshold){
     //sensorRにのみ反応があれば左折後退
-    rightBack();
+    _move(RIGHT_BACK);
     delay(turnPeriod);
-    doCommand(command);
+    _move(velocityLP, velocityLN, velocityRP, velocityRN);
   }
   else{
     while(ble_available()){
       byte value = ble_read();
-      byte bytes[4];
-      int red,green,blue;
 
       //valueで信号の種類を識別
       switch(value){
       case SET_UP:
         //速度(最高でも255だから特に変換は必要ない)
-        velocityL = ble_read();
-        velocityR = ble_read();
-        for(int i = 0 ; i < 3 ;i++){
-          //センサの閾値を変更
-          //byte配列の取得
-          for(int j = 0; j < 4 ; j++){
-            bytes[j] = ble_read();
-          }
-          switch(i){
-          case 0:
-            sensorThreshold = bytesToInt(bytes);
-            break;
-          case 1:
-            backPeriod = bytesToInt(bytes);
-            break;
-          case 2:
-            turnPeriod = bytesToInt(bytes);
-            break;
-          }
-        }
+        defVelocityL = ble_read();
+        defVelocityR = ble_read();
+        //Intの取得
+        sensorThreshold = ble_read_int();
+        backPeriod = ble_read_int();
+        turnPeriod = ble_read_int();
         break;
-        //コマンドを実行
-      case COMMAND:
-        command = ble_read();
-        doCommand(command);
+        //走行
+      case MOVE:
+        velocityLP = ble_read();
+        velocityLN = ble_read();
+        velocityRP = ble_read();
+        velocityRN = ble_read();
+
+        _move(velocityLP, velocityLN, velocityRP, velocityRN);
         break;
         //LEDの色を変更
       case SET_LED:
-        red = ble_read();
-        green  = ble_read();
-        blue = ble_read();
-        setLed(red,green,blue);
+        setLed(ble_read(), ble_read(), ble_read());
         break;
       }
     }
@@ -164,130 +152,36 @@ void loop(){
 
 //LEDの設定
 void setLed(int red,int green, int blue){
+  //Serial.println("LED");
   digitalWrite(ledRed, red);
   digitalWrite(ledGreen, green);
   digitalWrite(ledBlue, blue);
 }
 
-//コマンドの実行
-void doCommand(byte _command){
-  switch(_command){
-  case STOP:
-    _stop();
-    break;
-  case FORWARD:
-    forward();
-    break;
-  case BACK:
-    back();
-    break;
-  case TURN_LEFT:
-    turnLeft();
-    break;
-  case TURN_RIGHT:
-    turnRight();
-    break;
-  case LEFT_FORWARD:
-    leftForward();
-    break;
-  case RIGHT_FORWARD:
-    rightForward();
-    break;
-  case LEFT_BACK:
-    leftBack();
-    break;
-  case RIGHT_BACK:
-    rightBack();
-    break;
+//走行
+void _move(int velocityLP, int velocityLN, int velocityRP, int velocityRN){
+  //左
+  analogWrite(leftP, velocityLP);
+  analogWrite(leftN, velocityLN);
+  //右
+  analogWrite(rightP, velocityRP);
+  analogWrite(rightN, velocityRN);
+}
+
+//int型のデータを取得
+int ble_read_int(){
+  byte bytes[4];
+  for(int i = 0 ; i < 4 ; i++){
+    bytes[i] = ble_read();
   }
-}
 
-//停止
-void _stop(){
-  //Serial.println("STOP");
-  analogWrite(leftP, 0);
-  analogWrite(leftN, 0);
-  analogWrite(rightP, 0);
-  analogWrite(rightN, 0);
-}
-
-//前進
-void forward(){
-  //Serial.println("FORWARD");
-  analogWrite(leftP, velocityL);
-  analogWrite(leftN, 0);
-  analogWrite(rightP, velocityR);
-  analogWrite(rightN, 0);
-}
-
-//後退
-void back(){
-  //Serial.println("BACK");
-  analogWrite(leftP, 0);
-  analogWrite(leftN, velocityL);
-  analogWrite(rightP, 0);
-  analogWrite(rightN, velocityR);
-}
-
-//左回転
-void turnLeft(){
-  //Serial.println("TURN LEFT");
-  analogWrite(leftP, 0);
-  analogWrite(leftN, velocityL);
-  analogWrite(rightP, velocityR);
-  analogWrite(rightN, 0);
-}
-
-//右回転
-void turnRight(){
-  //Serial.println("TURN RIGHT");
-  analogWrite(leftP, velocityL);
-  analogWrite(leftN, 0);
-  analogWrite(rightP, 0);
-  analogWrite(rightN, velocityR);
-}
-
-//左折前進
-void leftForward(){
-  //Serial.println("LEFT_FORWARD");
-  analogWrite(leftP, 0);
-  analogWrite(leftN, 0);
-  analogWrite(rightP, velocityR);
-  analogWrite(rightN, 0);
-}
-
-//右折前進
-void rightForward(){
-  //Serial.println("RIGHT_FORWARD");
-  analogWrite(leftP, velocityL);
-  analogWrite(leftN, 0);
-  analogWrite(rightP, 0);
-  analogWrite(rightN, 0);
-}
-
-//左折後退
-void leftBack(){
-  //Serial.println("LEFT_BACK");
-  analogWrite(leftP, 0);
-  analogWrite(leftN, 0);
-  analogWrite(rightP, 0);
-  analogWrite(rightN, velocityR);
-}
-
-//右折前進
-void rightBack(){
-  //Serial.println("RIGHT_BACK");
-  analogWrite(leftP, 0);
-  analogWrite(leftN, velocityL);
-  analogWrite(rightP, 0);
-  analogWrite(rightN, 0);
-}
-
-//int型に変換
-int bytesToInt(byte bytes[]){
   int value;
   for(int i = 0 ; i < 4 ; i++){
     value = (value << 8) + bytes[i]; 
   }
   return value;
 }
+
+
+
+
