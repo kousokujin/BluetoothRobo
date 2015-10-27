@@ -497,10 +497,10 @@ bool lib_aci_close_remote_pipe(aci_state_t *aci_stat, uint8_t pipe)
   bool ret_val = false;
   aci_cmd_params_close_remote_pipe_t aci_cmd_params_close_remote_pipe;
 
-  if((p_services_pipe_type_map[pipe-1].location == ACI_STORE_REMOTE)&&
+  if(!((p_services_pipe_type_map[pipe-1].location == ACI_STORE_REMOTE)&&
         ((p_services_pipe_type_map[pipe-1].pipe_type == ACI_RX)||
          (p_services_pipe_type_map[pipe-1].pipe_type == ACI_RX_ACK_AUTO)||
-         (p_services_pipe_type_map[pipe-1].pipe_type == ACI_RX_ACK)))
+         (p_services_pipe_type_map[pipe-1].pipe_type == ACI_RX_ACK))))
   {
     return false;
   }  
@@ -609,6 +609,12 @@ bool lib_aci_event_get(aci_state_t *aci_stat, hal_aci_evt_t *p_aci_evt_data)
                 aci_stat->connection_interval = aci_evt->params.timing.conn_rf_interval;
                 aci_stat->slave_latency       = aci_evt->params.timing.conn_slave_rf_latency;
                 aci_stat->supervision_timeout = aci_evt->params.timing.conn_rf_timeout;
+            break;
+
+        case ACI_EVT_CONNECTED:
+                aci_stat->connection_interval = aci_evt->params.connected.conn_rf_interval;
+                aci_stat->slave_latency       = aci_evt->params.connected.conn_slave_rf_latency;
+                aci_stat->supervision_timeout = aci_evt->params.connected.conn_rf_timeout;
             break;
 
         default:

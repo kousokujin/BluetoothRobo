@@ -83,7 +83,7 @@ However this removes the need to do the setup of the nRF8001 on every reset.
 #endif
 
 /* Store the setup for the nRF8001 in the flash of the AVR to save on RAM */
-static hal_aci_data_t setup_msgs[NB_SETUP_MESSAGES] PROGMEM = SETUP_MESSAGES_CONTENT;
+static const hal_aci_data_t setup_msgs[NB_SETUP_MESSAGES] PROGMEM = SETUP_MESSAGES_CONTENT;
 
 // aci_struct that will contain
 // total initial credits
@@ -276,7 +276,7 @@ bool bond_data_read_store(aci_state_t *aci_stat)
       {
         //We failed the read dymanic data
         //Set the flag in the EEPROM that the contents of the EEPROM is invalid
-        EEPROM.write(0, 0x00);
+        EEPROM.write(0, 0xFF);
 
         status = false;
         break;
@@ -337,7 +337,7 @@ void aci_loop()
               {
                 uint8_t eeprom_status = 0;
                 eeprom_status = EEPROM.read(0);
-                if (eeprom_status != 0x00)
+                if (eeprom_status != 0xFF)
                 {
                   Serial.println(F("Previous Bond present. Restoring"));
                   Serial.println(F("Using existing bond stored in EEPROM."));
@@ -529,7 +529,7 @@ void aci_loop()
         {
           uint8_t eeprom_status = 0;
           eeprom_status = EEPROM.read(0);
-          if (eeprom_status != 0x00)
+          if (eeprom_status != 0xFF)
           {
             Serial.println(F("Previous Bond present. Restoring"));
             Serial.println(F("Using existing bond stored in EEPROM."));
@@ -650,7 +650,7 @@ void setup(void)
     aci_state.aci_setup_info.services_pipe_type_mapping = NULL;
   }
   aci_state.aci_setup_info.number_of_pipes    = NUMBER_OF_PIPES;
-  aci_state.aci_setup_info.setup_msgs         = setup_msgs;
+  aci_state.aci_setup_info.setup_msgs         = (hal_aci_data_t*) setup_msgs;
   aci_state.aci_setup_info.num_setup_msgs     = NB_SETUP_MESSAGES;
 
   //Tell the ACI library, the MCU to nRF8001 pin connections
@@ -684,7 +684,7 @@ void setup(void)
     Serial.println(F("Pairing/Bonding info cleared from EEPROM."));
     Serial.println(F("Remove the wire on Pin 6 and reset the board for normal operation."));
     //Address. Value
-    EEPROM.write(0, 0);
+    EEPROM.write(0, 0xFF);
     while(1) {};
   }
 }

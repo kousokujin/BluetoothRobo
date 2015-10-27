@@ -1,9 +1,9 @@
 
 #include <SPI.h>
+#include <EEPROM.h>
 #include <boards.h>
 #include <RBL_nRF8001.h>
-#include <services.h>
-#include <Servo.h> 
+#include <Servo.h>
 
 //Type
 #define SET_UP 0
@@ -52,7 +52,7 @@ int ledBlue = 17;
 int defVelocityL = DEFAULT_VELOCITY;
 int defVelocityR = DEFAULT_VELOCITY;
 
-int velocityLP,velocityLN,velocityRP,velocityRN;
+int velocityLP, velocityLN, velocityRP, velocityRN;
 
 //センサの閾値
 int sensorThreshold = DEFAULT_SENSOR_THRESHOLD;
@@ -63,7 +63,7 @@ int turnPeriod = DEFAULT_TURN_PERIOD;
 
 int connectionStatus = DISCONNECTED;
 
-void setup(){
+void setup() {
   //ピンの初期化
   pinMode(ledRed, OUTPUT);
   pinMode(ledGreen, OUTPUT);
@@ -80,70 +80,75 @@ void setup(){
   ble_begin();
 }
 
-void loop(){
+void loop() {
   int sensorL = analogRead(0);
   int sensorR = analogRead(1);
 
-  if(ble_connected() != connectionStatus){
+  if (ble_connected() != connectionStatus) {
     connectionStatus = ble_connected();
-    if(connectionStatus == CONNECTED){
+    if (connectionStatus == CONNECTED) {
+      Serial.println("Connected");
       //LED緑でいいかなめんどくさい
       setLed(GREEN);
     }
-    else{
+    else {
+      Serial.println("Disconnected");
       //LEDを赤く
       setLed(RED);
       //切断した場合強制停止
-      _move(velocityLP = 0, velocityLN = 0, velocityRP = 0, velocityRN = 0); 
-    }  
+      _move(velocityLP = 0, velocityLN = 0, velocityRP = 0, velocityRN = 0);
+    }
   }
 
   //センサL,R両方に反応があれば後退
-  if(sensorR > sensorThreshold && sensorL > sensorThreshold){
+  if (sensorR > sensorThreshold && sensorL > sensorThreshold) {
     _move(BACK);
     delay(backPeriod);
     _move(velocityLP, velocityLN, velocityRP, velocityRN);
   }
-  else if(sensorL > sensorThreshold){
+  else if (sensorL > sensorThreshold) {
     //sensorLにだけ反応があれば右折後退
     _move(LEFT_BACK);
     delay(turnPeriod);
     _move(velocityLP, velocityLN, velocityRP, velocityRN);
   }
-  else if(sensorR > sensorThreshold){
+  else if (sensorR > sensorThreshold) {
     //sensorRにのみ反応があれば左折後退
     _move(RIGHT_BACK);
     delay(turnPeriod);
     _move(velocityLP, velocityLN, velocityRP, velocityRN);
   }
-  else{
-    while(ble_available()){
+  else {
+    while (ble_available()) {
       byte value = ble_read();
 
       //valueで信号の種類を識別
-      switch(value){
-      case SET_UP:
-        //速度(最高でも255だから特に変換は必要ない)
-        defVelocityL = ble_read();
-        defVelocityR = ble_read();
-        //Intの取得
-        sensorThreshold = ble_read_int();
-        backPeriod = ble_read_int();
-        turnPeriod = ble_read_int();
-        break;
+      switch (value) {
+        case SET_UP:
+          Serial.println("SET_UP");
+          //速度(最高でも255だから特に変換は必要ない)
+          defVelocityL = ble_read();
+          defVelocityR = ble_read();
+          //Intの取得
+          sensorThreshold = ble_read_int();
+          backPeriod = ble_read_int();
+          turnPeriod = ble_read_int();
+          break;
         //走行
-      case MOVE:
-        velocityLP = ble_read();
-        velocityLN = ble_read();
-        velocityRP = ble_read();
-        velocityRN = ble_read();
+        case MOVE:
+          Serial.println("MOVE");
+          velocityLP = ble_read();
+          velocityLN = ble_read();
+          velocityRP = ble_read();
+          velocityRN = ble_read();
 
-        _move(velocityLP, velocityLN, velocityRP, velocityRN);
-        break;
+          _move(velocityLP, velocityLN, velocityRP, velocityRN);
+          break;
         //LEDの色を変更
-      case SET_LED:
-        setLed(ble_read(), ble_read(), ble_read());
-        break;
+        case SET_LED:
+          Serial.println("SET_LED");
+          setLed(ble_read(), ble_read(), ble_read());
+          break;
       }
     }
   }
@@ -151,7 +156,7 @@ void loop(){
 }
 
 //LEDの設定
-void setLed(int red,int green, int blue){
+void setLed(int red, int green, int blue) {
   //Serial.println("LED");
   digitalWrite(ledRed, red);
   digitalWrite(ledGreen, green);
@@ -159,7 +164,7 @@ void setLed(int red,int green, int blue){
 }
 
 //走行
-void _move(int velocityLP, int velocityLN, int velocityRP, int velocityRN){
+void _move(int velocityLP, int velocityLN, int velocityRP, int velocityRN) {
   //左
   analogWrite(leftP, velocityLP);
   analogWrite(leftN, velocityLN);
@@ -169,15 +174,15 @@ void _move(int velocityLP, int velocityLN, int velocityRP, int velocityRN){
 }
 
 //int型のデータを取得
-int ble_read_int(){
+int ble_read_int() {
   byte bytes[4];
-  for(int i = 0 ; i < 4 ; i++){
+  for (int i = 0 ; i < 4 ; i++) {
     bytes[i] = ble_read();
   }
 
   int value;
-  for(int i = 0 ; i < 4 ; i++){
-    value = (value << 8) + bytes[i]; 
+  for (int i = 0 ; i < 4 ; i++) {
+    value = (value << 8) + bytes[i];
   }
   return value;
 }

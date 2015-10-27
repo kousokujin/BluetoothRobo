@@ -37,6 +37,7 @@
  *
  */
 #include <SPI.h>
+#include <EEPROM.h>
 #include "services.h"
 #include <lib_aci.h>
 #include <aci_setup.h>
@@ -59,7 +60,7 @@
 Store the nRF8001 setup information generated on the flash of the AVR.
 This reduces the RAM requirements for the nRF8001.
 */
-static hal_aci_data_t setup_msgs[NB_SETUP_MESSAGES] PROGMEM = SETUP_MESSAGES_CONTENT;
+static const hal_aci_data_t setup_msgs[NB_SETUP_MESSAGES] PROGMEM = SETUP_MESSAGES_CONTENT;
 // an aci_struct that will contain
 // total initial credits
 // current credit
@@ -124,20 +125,6 @@ void Timer1stop()
   TIMSK1 = 0x00;
 }
 
-/*** FUNC
-Name:       Timer1 ISR
-Function:   Handles the Timer1-overflow interrupt
-FUNC ***/
-ISR(TIMER1_OVF_vect)
-{
-  perform_heart_rate_simulation();
-  lib_aci_get_battery_level();
-
-  TCNT1H = 11;    // Approx 4000 ms - Reload
-  TCNT1L = 0;
-  TIFR1  = 0x00;    // timer1 int flag reg: clear timer overflow flag
-};
-
 void perform_heart_rate_simulation(void)
 {
   static uint8_t dummy_heart_rate = 65;
@@ -161,6 +148,20 @@ void perform_heart_rate_simulation(void)
     }
   }
 }
+
+/*** FUNC
+Name:       Timer1 ISR
+Function:   Handles the Timer1-overflow interrupt
+FUNC ***/
+ISR(TIMER1_OVF_vect)
+{
+  perform_heart_rate_simulation();
+  lib_aci_get_battery_level();
+
+  TCNT1H = 11;    // Approx 4000 ms - Reload
+  TCNT1L = 0;
+  TIFR1  = 0x00;    // timer1 int flag reg: clear timer overflow flag
+};
 
 /* Define how assert should function in the BLE library */
 void __ble_assert(const char *file, uint16_t line)
@@ -200,7 +201,7 @@ void setup(void)
     aci_state.aci_setup_info.services_pipe_type_mapping = NULL;
   }
   aci_state.aci_setup_info.number_of_pipes    = NUMBER_OF_PIPES;
-  aci_state.aci_setup_info.setup_msgs         = setup_msgs;
+  aci_state.aci_setup_info.setup_msgs		  = (hal_aci_data_t*)setup_msgs;
   aci_state.aci_setup_info.num_setup_msgs     = NB_SETUP_MESSAGES;
 
   //Tell the ACI library, the MCU to nRF8001 pin connections
